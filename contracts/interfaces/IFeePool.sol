@@ -1,5 +1,6 @@
 pragma solidity 0.4.25;
 
+
 interface IFeePool {
     /**
      * @notice Check if a particular address is able to claim fees right now

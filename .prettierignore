@@ -1,0 +1,6 @@
+contracts/Migrations.sol
+contracts/test/Factory.sol
+contracts/test/MultiSigWallet.sol
+contracts/test/MultiSigWalletFactory.sol
+contracts/test/MultiSigWalletWithDailyLimit.sol
+contracts/test/MultiSigWalletWithDailyLimitFactory.sol

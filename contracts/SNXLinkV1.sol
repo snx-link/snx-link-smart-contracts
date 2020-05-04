@@ -2,12 +2,13 @@ pragma solidity 0.4.25;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-import './interfaces/IMultiSigWalletWithDailyLimit.sol';
+import "./interfaces/IMultiSigWalletWithDailyLimit.sol";
 import "./interfaces/IMultiSigWalletWithDailyLimitFactory.sol";
 import "./interfaces/IFeePool.sol";
 import "./interfaces/IDelegateApprovals.sol";
 
 import "./utils/Withdrawable.sol";
+
 
 contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
     using SafeMath for uint256;
@@ -55,55 +56,40 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
     // @notice Total rewards claimed;
     uint256 public totalRewardsClaimed;
 
-
     /// Events
 
     // @notice Emits when fee sent to the claimer.
-    event PayFeeToClaimer(
-        address indexed claimer,
-        uint256 amount
-    );
+    event PayFeeToClaimer(address indexed claimer, uint256 amount);
 
     // @notice Emits when fee sent to the platform.
     event PayFeeToPlatform();
 
     // @notice Emits when claimer claims on behalf of user.
-    event Claim(
-        address indexed user,
-        address indexed claimer,
-        uint256 availableFees,
-        uint256 availableRewards
-    );
+    event Claim(address indexed user, address indexed claimer, uint256 availableFees, uint256 availableRewards);
 
     // @notice Emits when the user register.
     event Register(address indexed user);
 
     // @notice Emits when the user change settings.
-    event ChangeSettings(
-        address indexed user,
-        uint256 maxGasPrice,
-        uint256 maxFeePerClaim,
-        uint256 enabled
-    );
-
+    event ChangeSettings(address indexed user, uint256 maxGasPrice, uint256 maxFeePerClaim, uint256 enabled);
 
     /// Modifiers
 
     // @dev Throws if the user does not exists
     modifier onlyRegisteredUser(address user) {
-        require(isRegistered(user), 'Auch! User is not registered');
+        require(isRegistered(user), "Auch! User is not registered");
         _;
     }
 
     // @dev Throws if the gasPrice is invalid
     modifier validMaxGasPrice(uint256 maxGasPrice) {
-        require(maxGasPrice != 0, 'Max Gas Price should be greater than 0');
+        require(maxGasPrice != 0, "Max Gas Price should be greater than 0");
         _;
     }
 
     // @dev Throws if the gasPrice is invalid
     modifier validMaxFeePerClaim(uint256 maxFeePerClaim) {
-        require(maxFeePerClaim != 0, 'Max Fee per Claim should be greater than 0');
+        require(maxFeePerClaim != 0, "Max Fee per Claim should be greater than 0");
         _;
     }
 
@@ -135,24 +121,23 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
     }
 
     function register(uint256 _maxGasPrice, uint256 _maxFeePerClaim)
+        external
+        payable
         validMaxGasPrice(_maxGasPrice)
         validMaxFeePerClaim(_maxFeePerClaim)
-        external payable returns (address) {
-        require(!isRegistered(msg.sender), 'User already registered');
+        returns (address)
+    {
+        require(!isRegistered(msg.sender), "User already registered");
 
         address[] memory owners = new address[](2);
         owners[0] = msg.sender;
         owners[1] = address(this);
 
-        address userWallet = userFeeWalletFactory.create(
-            owners,
-            1,
-            0
-        );
+        address userWallet = userFeeWalletFactory.create(owners, 1, 0);
 
         userFeeWallets[msg.sender] = IMultiSigWalletWithDailyLimit(userWallet);
 
-        require(userWallet.call.value(msg.value)(''), 'Transfer failed');
+        require(userWallet.call.value(msg.value)(""), "Transfer failed");
 
         userMaxGasPrices[msg.sender] = _maxGasPrice;
         userMaxFeePerClaim[msg.sender] = _maxFeePerClaim;
@@ -164,40 +149,34 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
         return userWallet;
     }
 
-    function setMaxGasPrice(uint256 _maxGasPrice)
-        validMaxGasPrice(_maxGasPrice)
-        onlyRegisteredUser(msg.sender)
-        external {
-        require(userMaxGasPrices[msg.sender] != _maxGasPrice, 'Same setting');
+    function setMaxGasPrice(uint256 _maxGasPrice) external validMaxGasPrice(_maxGasPrice) onlyRegisteredUser(msg.sender) {
+        require(userMaxGasPrices[msg.sender] != _maxGasPrice, "Same setting");
 
         userMaxGasPrices[msg.sender] = _maxGasPrice;
         emit ChangeSettings(msg.sender, _maxGasPrice, 0, 0);
     }
 
     function setMaxFeePerClaim(uint256 _maxFeePerClaim)
+        external
         validMaxFeePerClaim(_maxFeePerClaim)
         onlyRegisteredUser(msg.sender)
-        external {
-        require(userMaxFeePerClaim[msg.sender] != _maxFeePerClaim, 'Same setting');
+    {
+        require(userMaxFeePerClaim[msg.sender] != _maxFeePerClaim, "Same setting");
 
         userMaxFeePerClaim[msg.sender] = _maxFeePerClaim;
         emit ChangeSettings(msg.sender, 0, _maxFeePerClaim, 0);
     }
 
-    function enable()
-        onlyRegisteredUser(msg.sender)
-        external {
-        require(userAutoClaimDisabled[msg.sender], 'Already enabled');
+    function enable() external onlyRegisteredUser(msg.sender) {
+        require(userAutoClaimDisabled[msg.sender], "Already enabled");
 
         userAutoClaimDisabled[msg.sender] = false;
         disabledUsersCount--;
         emit ChangeSettings(msg.sender, 0, 0, 1);
     }
 
-    function disable()
-        onlyRegisteredUser(msg.sender)
-        external {
-        require(!userAutoClaimDisabled[msg.sender], 'Already disabled');
+    function disable() external onlyRegisteredUser(msg.sender) {
+        require(!userAutoClaimDisabled[msg.sender], "Already disabled");
 
         userAutoClaimDisabled[msg.sender] = true;
         disabledUsersCount++;
@@ -208,11 +187,7 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
         uint256 _maxGasPrice,
         uint256 _maxFeePerClaim,
         bool _enabled
-    )   validMaxGasPrice(_maxGasPrice)
-        validMaxFeePerClaim(_maxFeePerClaim)
-        onlyRegisteredUser(msg.sender)
-        external {
-
+    ) external validMaxGasPrice(_maxGasPrice) validMaxFeePerClaim(_maxFeePerClaim) onlyRegisteredUser(msg.sender) {
         uint256 maxGasPrice;
         uint256 maxFeePerClaim;
         uint256 enabled;
@@ -245,46 +220,36 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
             changed = true;
         }
 
-        require(changed, 'Nothing changed');
+        require(changed, "Nothing changed");
 
-        emit ChangeSettings(
-            msg.sender,
-            maxGasPrice,
-            maxFeePerClaim,
-            enabled
-        );
+        emit ChangeSettings(msg.sender, maxGasPrice, maxFeePerClaim, enabled);
     }
 
-    function topUp()
-        onlyRegisteredUser(msg.sender)
-        external payable {
-        require(address(userFeeWallets[msg.sender]).call.value(msg.value)(''), 'Transfer failed');
+    function topUp() external payable onlyRegisteredUser(msg.sender) {
+        require(address(userFeeWallets[msg.sender]).call.value(msg.value)(""), "Transfer failed");
     }
 
-    function withdraw(uint256 value)
-        onlyRegisteredUser(msg.sender)
-        nonReentrant
-        external {
+    function withdraw(uint256 value) external onlyRegisteredUser(msg.sender) nonReentrant {
         IMultiSigWalletWithDailyLimit userFeeWallet = userFeeWallets[msg.sender];
 
-        uint256 txid = userFeeWallet.submitTransaction(msg.sender, value, '');
+        uint256 txid = userFeeWallet.submitTransaction(msg.sender, value, "");
 
-        (,,,bool executed) = userFeeWallet.transactions(txid);
-        require(executed, 'Unable to withdraw from user wallet!');
+        (, , , bool executed) = userFeeWallet.transactions(txid);
+        require(executed, "Unable to withdraw from user wallet!");
     }
 
-    function canClaimFor(address authoriser, address /* delegate */)
-        external view returns (bool) {
-        return snxDelegateApprovals.canClaimFor(authoriser, address (this));
+    function canClaimFor(
+        address authoriser,
+        address /* delegate */
+    ) external view returns (bool) {
+        return snxDelegateApprovals.canClaimFor(authoriser, address(this));
     }
 
-    function isFeesClaimable(address account)
-        public view returns (bool) {
+    function isFeesClaimable(address account) public view returns (bool) {
         return snxFeePool.isFeesClaimable(account);
     }
 
-    function feesAvailable(address account)
-        public view returns (uint, uint) {
+    function feesAvailable(address account) public view returns (uint, uint) {
         return snxFeePool.feesAvailable(account);
     }
 
@@ -299,22 +264,19 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
             snxDelegateApprovals.canClaimFor(user, address(this));
     }
 
-    function claimOnBehalf(address user)
-        nonReentrant
-        public returns(bool) {
-
+    function claimOnBehalf(address user) public nonReentrant returns (bool) {
         // Start gas counting
         uint256 startGas = gasleft();
 
-        require(isRegistered(user), 'User is not registered');
+        require(isRegistered(user), "User is not registered");
 
-        require(!userAutoClaimDisabled[user], 'User disabled auto-claim');
+        require(!userAutoClaimDisabled[user], "User disabled auto-claim");
 
-        require(tx.gasprice <= userMaxGasPrices[user], 'Gas Price higher than user configured');
+        require(tx.gasprice <= userMaxGasPrices[user], "Gas Price higher than user configured");
 
         (uint256 availableFees, uint256 availableRewards) = snxFeePool.feesAvailable(user);
 
-        require(snxFeePool.claimOnBehalf(user), 'Failed to ClaimOnBehalf');
+        require(snxFeePool.claimOnBehalf(user), "Failed to ClaimOnBehalf");
 
         totalFeesClaimed = totalFeesClaimed.add(availableFees);
         totalRewardsClaimed = totalRewardsClaimed.add(availableRewards);
@@ -324,26 +286,25 @@ contract SNXLinkV1 is Withdrawable, IFeePool, IDelegateApprovals {
 
         // End gas counting
 
-        uint256 totalRefundForClaimer =
-            ((gasUsed.add(gasOffsetCorrection)).mul(tx.gasprice)).add(claimerFee);
+        uint256 totalRefundForClaimer = ((gasUsed.add(gasOffsetCorrection)).mul(tx.gasprice)).add(claimerFee);
 
         uint256 totalToWithdraw = totalRefundForClaimer.add(platformFee);
-        require(totalToWithdraw <= userMaxFeePerClaim[user], 'Total cost higher than user configured');
+        require(totalToWithdraw <= userMaxFeePerClaim[user], "Total cost higher than user configured");
 
         IMultiSigWalletWithDailyLimit userFeeWallet = userFeeWallets[user];
-        uint256 txid = userFeeWallet.submitTransaction(address(this), totalToWithdraw, '');
+        uint256 txid = userFeeWallet.submitTransaction(address(this), totalToWithdraw, "");
 
-        (,,,bool executed) = userFeeWallet.transactions(txid);
-        require(executed, 'Unable to withdraw from user wallet!');
+        (, , , bool executed) = userFeeWallet.transactions(txid);
+        require(executed, "Unable to withdraw from user wallet!");
 
-        require(msg.sender.call.value(totalRefundForClaimer)(''), 'Transfer to claimer failed');
+        require(msg.sender.call.value(totalRefundForClaimer)(""), "Transfer to claimer failed");
         emit PayFeeToClaimer(msg.sender, totalRefundForClaimer);
 
-        require(feeCollector.call.value(platformFee)(''), 'Transfer to feeCollector failed');
+        require(feeCollector.call.value(platformFee)(""), "Transfer to feeCollector failed");
         emit PayFeeToPlatform();
 
         return true;
     }
 
-    function () payable {}
+    function() payable {}
 }

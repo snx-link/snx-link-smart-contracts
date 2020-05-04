@@ -1,9 +1,9 @@
-pragma solidity ^0.4.0;
+pragma solidity 0.4.25;
 
 import "../interfaces/IFeePool.sol";
 
-contract MockFeePool is IFeePool{
 
+contract MockFeePool is IFeePool {
     mapping(address => bool) public feesClaimable;
 
     mapping(address => uint) public fees;
@@ -19,7 +19,11 @@ contract MockFeePool is IFeePool{
         return feesClaimable[account];
     }
 
-    function setFeesAvailable(address account, uint fee, uint reward) external {
+    function setFeesAvailable(
+        address account,
+        uint fee,
+        uint reward
+    ) external {
         fees[account] = fee;
         rewards[account] = reward;
     }
@@ -35,5 +39,4 @@ contract MockFeePool is IFeePool{
     function claimOnBehalf(address claimingForAddress) external returns (bool) {
         return !failClaim;
     }
-
 }

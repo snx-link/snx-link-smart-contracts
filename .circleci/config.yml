@@ -1,0 +1,89 @@
+version: 2
+jobs:
+  checkout_and_install:
+    docker:
+      - image: circleci/node:12.16.3
+    working_directory: ~/snxlink
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: Install Dependencies
+          command: yarn install --quiet
+      - save_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+          paths:
+            - node_modules
+      - save_cache:
+          key: snxlink-{{ .Environment.CIRCLE_SHA1 }}
+          paths:
+            - ~/snxlink
+      - persist_to_workspace:
+          root: ~/
+          paths: snxlink
+  lint:
+    docker:
+      - image: circleci/node:12.16.3
+    working_directory: ~/snxlink
+    steps:
+      - restore_cache:
+          key: snxlink-{{ .Environment.CIRCLE_SHA1 }}
+      - run:
+          name: Lint
+          command: yarn lint
+  build:
+    docker:
+      - image: circleci/node:12.16.3
+      - image: ethereum/solc:0.4.25
+    working_directory: ~/snxlink
+    steps:
+      - restore_cache:
+          key: snxlink-{{ .Environment.CIRCLE_SHA1 }}
+      - run:
+          name: Compile contracts
+          command: yarn compile
+      - save_cache:
+          key: snxlink-contracts-build-{{ .Environment.CIRCLE_SHA1 }}
+          paths:
+            - ~/snxlink
+  test:
+    docker:
+      - image: circleci/node:12.16.3
+      - image: trufflesuite/ganache-cli:v6.9.1
+        command: ganache-cli -d
+    working_directory: ~/snxlink
+    steps:
+      - restore_cache:
+          key: snxlink-contracts-build-{{ .Environment.CIRCLE_SHA1 }}
+      - run:
+          name: Run tests
+          command: yarn test
+  slither:
+    docker:
+      - image: trailofbits/eth-security-toolbox
+    steps:
+      - attach_workspace:
+          at: ~/workspace
+      - run:
+          name: Slither
+          command: slither ~/workspace/snxlink --filter-paths "test|openzeppelin-solidity" --exclude=arbitrary-send,reentrancy-no-eth,uninitialized-local,reentrancy-benign,reentrancy-events,external-function,naming-convention,low-level-calls,solc-version
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - checkout_and_install
+      - lint:
+          requires:
+            - checkout_and_install
+      - build:
+          requires:
+            - checkout_and_install
+      - test:
+          requires:
+            - build
+      - slither:
+          requires:
+            - build
